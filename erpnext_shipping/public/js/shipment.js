@@ -51,6 +51,14 @@ frappe.ui.form.on("Shipment", {
 
 	fetch_shipping_rates: function (frm) {
 		if (!frm.doc.shipment_id) {
+			let aramex_details = {
+				aramex_product_group: frm.doc.aramex_product_group
+					? frm.doc.aramex_product_group
+					: "",
+				product_type: frm.doc.product_type ? frm.doc.product_type : "",
+				payment_type: frm.doc.payment_type ? frm.doc.payment_type : "",
+				payment_option: frm.doc.payment_option ? frm.doc.payment_option : "",
+			};
 			frappe.call({
 				method: "erpnext_shipping.erpnext_shipping.shipping.fetch_shipping_rates",
 				freeze: true,
@@ -70,7 +78,8 @@ frappe.ui.form.on("Shipment", {
 					delivery_contact_name: frm.doc.delivery_contact_name,
 					value_of_goods: frm.doc.value_of_goods,
 					pickup_company: frm.doc.pickup_company,
-					total_weight: frm.doc.net_total_weight
+					total_weight: frm.doc.net_total_weight,
+					aramex_details: aramex_details ? aramex_details : {},
 				},
 				callback: function (r) {
 					if (r.message && r.message.length) {
@@ -139,8 +148,6 @@ frappe.ui.form.on("Shipment", {
 			},
 		});
 	},
-
-	
 });
 
 function select_from_available_services(frm, available_services) {
@@ -236,7 +243,6 @@ function select_from_available_services(frm, available_services) {
 	dialog.show();
 }
 
-
 // frappe.ui.form.on('Shipment Parcel', {
 // 	weight: function (frm, cdt, cdn){
 // 		let row = frappe.get_doc(cdt, cdn);
@@ -250,22 +256,21 @@ function select_from_available_services(frm, available_services) {
 
 // 			frm.set_value('net_total_weight', net_total_weight);
 // 		}
-// 	} 
+// 	}
 // });
 
-
-frappe.ui.form.on('Shipment', {
-    validate: function (frm) {
-        frappe.call({
-            method: 'erpnext_shipping.erpnext_shipping.shiprocket.shiprocket.calculate_total_weight',
-            args: {
-                shipment_parcel: frm.doc.shipment_parcel
-            },
-            callback: function (r) {
-                if (r.message) {
-                    frm.set_value('net_total_weight', r.message);
-                }
-            }
-        });
-    }
+frappe.ui.form.on("Shipment", {
+	validate: function (frm) {
+		frappe.call({
+			method: "erpnext_shipping.erpnext_shipping.shiprocket.shiprocket.calculate_total_weight",
+			args: {
+				shipment_parcel: frm.doc.shipment_parcel,
+			},
+			callback: function (r) {
+				if (r.message) {
+					frm.set_value("net_total_weight", r.message);
+				}
+			},
+		});
+	},
 });

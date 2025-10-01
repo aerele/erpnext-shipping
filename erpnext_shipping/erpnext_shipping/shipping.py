@@ -5,10 +5,14 @@ import json
 import frappe
 from erpnext.stock.doctype.shipment.shipment import get_company_contact
 
-from erpnext_shipping.erpnext_shipping.aramex.aramex import ARAMEX_PROVIDER, AramexUtils
 from erpnext_shipping.erpnext_shipping.delhivery_one.delhivery_one import (
 	DELHIVERY_PROVIDER,
 	DelhiveryOneUtils,
+)
+from erpnext_shipping.erpnext_shipping.doctype.aramex.aramex import (
+	ARAMEX_PROVIDER,
+	AramexUtils,
+	is_aramex_enabled,
 )
 from erpnext_shipping.erpnext_shipping.doctype.letmeship.letmeship import (
 	LETMESHIP_PROVIDER,
@@ -41,6 +45,7 @@ def fetch_shipping_rates(
 	delivery_contact_name=None,
 	pickup_company=None,
 	total_weight=None,
+	aramex_details=None,
 ):
 	# Return Shipping Rates for the various Shipping Providers
 	shipment_prices = []
@@ -49,6 +54,7 @@ def fetch_shipping_rates(
 	delhivery_one_enabled = get_shipping_provider(pickup_company, "Delhiveryone")
 	shiprocket_enabled = get_shipping_provider(pickup_company, "Shiprocket")
 	aramex_enabled = get_shipping_provider(pickup_company, "Aramex")
+	aramex_enabled = is_aramex_enabled()
 	pickup_address = get_address(pickup_address_name)
 	delivery_address = get_address(delivery_address_name)
 	parcels = json.loads(parcels)
@@ -115,17 +121,19 @@ def fetch_shipping_rates(
 		delhivery_prices = match_parcel_service_type_carrier(delhivery_prices, "carrier", "service_name")
 		shipment_prices += delhivery_prices
 
-	if aramex_enabled and pickup_from_type == "Company":
-		aramex = AramexUtils(company=pickup_company)
+	if aramex_enabled:
+		aramex = AramexUtils()
 		aramex_prices = (
 			aramex.get_available_services(
-				delivery_address=delivery_address,
 				pickup_address=pickup_address,
-				weight=total_weight,
+				delivery_address=delivery_address,
 				parcels=parcels,
+				aramex_details=aramex_details,
 			)
 			or []
 		)
+		print("aramex_prices", aramex_prices)
+
 		aramex_prices = match_parcel_service_type_carrier(aramex_prices, "carrier", "service_name")
 		shipment_prices += aramex_prices
 
@@ -174,6 +182,12 @@ def create_shipment(
 	else:
 		delivery_contact = get_company_contact(user=pickup_contact_name)
 		pickup_contact.email_id = pickup_contact.pop("email", None)
+
+	delivery_contact = get_contact(delivery_contact_name)
+
+	print("service_info", service_info)
+
+	print(service_info["service_provider"])
 
 	if service_info["service_provider"] == LETMESHIP_PROVIDER:
 		letmeship = get_letmeship_utils()
@@ -251,6 +265,19 @@ def create_shipment(
 			total_weight=total_weight,
 		)
 
+	if service_info["service_provider"] == ARAMEX_PROVIDER:
+		print("---------------------aramex-----------------------")
+		aramex = AramexUtils()
+		shipment_info = aramex.create_shipment(
+			shipment=shipment,
+			pickup_address=pickup_address,
+			pickup_contact=pickup_contact,
+			delivery_address=delivery_address,
+			delivery_contact=delivery_contact,
+			shipment_details=shipment_parcel,
+			service_info=service_info,
+		)
+
 	if shipment_info:
 		shipment = frappe.get_doc("Shipment", shipment)
 		shipment.db_set(
@@ -312,6 +339,10 @@ def print_shipping_label(shipment: str):
 	elif service_provider == DELHIVERY_PROVIDER:
 		delhivery = DelhiveryOneUtils(company=pickup_company)
 		shipping_label = delhivery.get_label(shipment_id)
+	elif service_provider == ARAMEX_PROVIDER:
+		aramex = AramexUtils()
+		print(aramex)
+		shipping_label = aramex.get_label(shipment_id)
 
 	return shipping_label
 

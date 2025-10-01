@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-09-12 18:11:18.215100",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enable",
+  "is_sandbox",
+  "user_name",
+  "password",
+  "account_number",
+  "account_pin",
+  "account_entity",
+  "account_country_code"
+ ],
+ "fields": [
+  {
+   "fieldname": "user_name",
+   "fieldtype": "Data",
+   "label": "User Name"
+  },
+  {
+   "fieldname": "password",
+   "fieldtype": "Data",
+   "label": "Password"
+  },
+  {
+   "fieldname": "account_number",
+   "fieldtype": "Data",
+   "label": "Account Number"
+  },
+  {
+   "fieldname": "account_pin",
+   "fieldtype": "Data",
+   "label": "Account Pin"
+  },
+  {
+   "fieldname": "account_entity",
+   "fieldtype": "Data",
+   "label": "Account Entity"
+  },
+  {
+   "fieldname": "account_country_code",
+   "fieldtype": "Data",
+   "label": "Account Country Code"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_sandbox",
+   "fieldtype": "Check",
+   "label": "Is Sandbox"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable",
+   "fieldtype": "Check",
+   "label": "Enable"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-09-26 18:36:27.623275",
+ "modified_by": "Administrator",
+ "module": "ERPNext Shipping",
+ "name": "Aramex1",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
