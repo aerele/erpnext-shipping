@@ -126,9 +126,9 @@ def create_shipment(
 	service_data: str,
 	shipment_notific_email: str | None = None,
 	tracking_notific_email: str | None = None,
-	pickup_contact_name=None,
-	delivery_contact_name=None,
-	delivery_notes=None,
+	pickup_contact_name: str | None = None,
+	delivery_contact_name: str | None = None,
+	delivery_notes: str | list[str] | None = None,
 	pickup_company: str | None = None,
 ):
 
@@ -140,7 +140,7 @@ def create_shipment(
 
 	if delivery_notes is None:
 		delivery_notes = []
-
+	validate_delivery_notes(shipment, delivery_notes)
 	service_info = json.loads(service_data)
 	shipment_info, pickup_contact, delivery_contact = None, None, None
 	pickup_address = get_address(pickup_address_name)
@@ -295,7 +295,7 @@ def update_tracking(
 
 	if delivery_notes is None:
 		delivery_notes = []
-
+	validate_delivery_notes(shipment, delivery_notes)
 	shipment = frappe.get_doc("Shipment", shipment)
 	pickup_company = shipment.pickup_company
 
@@ -335,6 +335,24 @@ def normalize_tracking_data(tracking_data: dict[str, Any]) -> dict[str, Any]:
 	if raw_status:
 		tracking_data.tracking_status = status_map.get(raw_status.upper(), raw_status)
 	return tracking_data
+
+
+def validate_delivery_notes(shipment: str, delivery_notes: list[str]) -> None:
+	"""Ensure each Delivery Note is linked to the Shipment and the user can write it."""
+	linked_delivery_notes = set(
+		frappe.get_all(
+			"Shipment Delivery Note",
+			filters={"parent": shipment, "parenttype": "Shipment"},
+			pluck="delivery_note",
+		)
+	)
+	for delivery_note in delivery_notes:
+		if delivery_note not in linked_delivery_notes:
+			frappe.throw(
+				_("Delivery Note {0} is not linked to Shipment {1}").format(delivery_note, shipment),
+				frappe.PermissionError,
+			)
+		frappe.has_permission("Delivery Note", "write", delivery_note, throw=True)
 
 
 def update_delivery_note(
