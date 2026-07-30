@@ -28,6 +28,8 @@ def get_address(address_name):
 			"pincode",
 			"country",
 			"state",
+			"phone",
+			"email_id",
 		],
 		as_dict=1,
 	)
@@ -43,7 +45,7 @@ def get_address(address_name):
 
 def validate_address(address):
 	if not address.country:
-		frappe.throw(f"Please add a valid country in Address {address.address_title}.")
+		frappe.throw(_("Please add a valid country in Address {0}.").format(address.address_title))
 
 	if not address.pincode or address.pincode.strip() == "":
 		frappe.throw(_("Please add a valid pincode in Address {0}.").format(address.address_title))
@@ -134,35 +136,55 @@ def update_tracking_info_daily():
 	"""
 	from erpnext_shipping.erpnext_shipping.shipping import update_tracking
 
-	shipments = frappe.get_all(
-		"Shipment",
-		filters={
-			"docstatus": 1,
-			"status": "Booked",
-			"shipment_id": ["!=", ""],
-			"tracking_status": ["!=", "Delivered"],
-		},
-	)
-	for shipment in shipments:
-		shipment_doc = frappe.get_doc("Shipment", shipment.name)
-		tracking_info = update_tracking(
-			shipment.name,
-			shipment_doc.service_provider,
-			shipment_doc.shipment_id,
-			shipment_doc.shipment_delivery_note,
+	try:
+		shipments = frappe.get_all(
+			"Shipment",
+			filters={
+				"docstatus": 1,
+				"status": "Booked",
+				"shipment_id": ["!=", ""],
+				"tracking_status": ["!=", "Delivered"],
+			},
+			fields=["name", "service_provider", "shipment_id", "awb_number"],
 		)
+		for shipment in shipments:
+			delivery_notes = frappe.get_all(
+				"Shipment Delivery Note",
+				filters={"parent": shipment.name},
+				pluck="delivery_note",
+			)
+			tracking_info = update_tracking(
+				shipment.name,
+				shipment.service_provider,
+				shipment.shipment_id,
+				delivery_notes,
+				shipment.awb_number,
+			)
 
-		if tracking_info:
-			fields = ["awb_number", "tracking_status", "tracking_status_info", "tracking_url"]
-			for field in fields:
-				shipment_doc.db_set(field, tracking_info.get(field))
+			if tracking_info:
+				frappe.db.set_value(
+					"Shipment",
+					shipment.name,
+					{
+						"awb_number": tracking_info.get("awb_number"),
+						"tracking_status": tracking_info.get("tracking_status"),
+						"tracking_status_info": tracking_info.get("tracking_status_info"),
+						"tracking_url": tracking_info.get("tracking_url"),
+					},
+				)
+	except Exception:
+		frappe.log_error(
+			title="Shipment Tracking Update Failed",
+			message=frappe.get_traceback(),
+		)
 
 
 def get_enabled_doc_for_company(doctype: str, company: str) -> dict | None:
 	filters = {"company": company, "enabled": True}
 
-	if frappe.db.exists(doctype, filters):
-		return frappe.get_doc(doctype, filters)
+	docname = frappe.db.exists(doctype, filters)
+	if docname:
+		return frappe.get_doc(doctype, docname)
 
 	return None
 
@@ -170,7 +192,10 @@ def get_enabled_doc_for_company(doctype: str, company: str) -> dict | None:
 def handle_shipping_error(
 	name: str, provider: str, message: str, exception: Exception, raise_exception: bool
 ) -> None:
-	frappe.log_error(message, str(exception))
+	frappe.log_error(
+		title=f"{provider} Shipping Error",
+		message=f"{message}\n\n{exception}",
+	)
 	throw_shipping_error(name, provider, f"{message}: {str(exception)}", raise_exception)
 
 
@@ -180,11 +205,13 @@ def throw_shipping_error(doc_name: str, provider: str, message: str, raise_excep
 	"""
 	frappe.msgprint(
 		msg=_(
-			f"<b>{provider}:</b> {message}<br>"
-			f"Disable the {provider} Account if you need to continue without {provider}: "
-			f"{get_link_to_form(provider, doc_name)}"
+			"<b>{0}:</b> {1}<br>" "Disable the {0} Account if you need to continue without {0}: {2}"
+		).format(
+			provider,
+			message,
+			get_link_to_form(provider, doc_name),
 		),
-		raise_exception=_(raise_exception),
+		raise_exception=raise_exception,
 	)
 
 
@@ -197,7 +224,12 @@ def validate_enabled_service(doctype, name, company):
 	existing_doc = frappe.db.exists(doctype, {"company": company, "enabled": True})
 
 	if existing_doc and existing_doc != name:
-		frappe.msgprint(_(f"Only one {doctype} can be enabled at a time for the company <b>{company}</b>."))
+		frappe.msgprint(
+			_("Only one {0} can be enabled at a time for the company <b>{1}</b>.").format(
+				doctype,
+				company,
+			)
+		)
 		return False
 	return True
 
